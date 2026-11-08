@@ -46,6 +46,10 @@ def _default_model_for(base_url: str) -> str:
 
 def load_embed_settings() -> EmbedSettings:
     """优先级：EMBED_* > 聊天客户端配置（仅当厂商支持 embedding）。"""
+    from code.shared.llm_client import load_env_file
+
+    load_env_file()  # 独立调用本模块时也要能读到 .env 里的 EMBED_*
+
     base_url = os.getenv("EMBED_BASE_URL", "")
     api_key = os.getenv("EMBED_API_KEY", "")
     model = os.getenv("EMBED_MODEL", "")

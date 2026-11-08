@@ -105,3 +105,43 @@ python code/week01/day01_md5.py --help
 | `chromadb` 装不上 | 缺 C++ 编译环境 | 升级 pip；或改用 `faiss-cpu`/自写 numpy 向量库（Day 13 有实现） |
 | 中文乱码（Windows） | 控制台默认 GBK | `chcp 65001`，或代码里 `sys.stdout.reconfigure(encoding="utf-8")` |
 | PowerShell 禁止运行脚本 | 执行策略 | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `python` 命令**没有任何输出**、`$LASTEXITCODE=9009` | 装的是应用商店占位符，机器上其实没有 Python | 见下面「Windows：python 命令静默失败」 |
+
+### Windows：`python` 命令静默失败
+
+症状：敲 `python -c "print('hi')"` 后命令行立刻回到提示符，**不报错也没输出**。
+
+```powershell
+where.exe python
+# C:\Users\<你>\AppData\Local\Microsoft\WindowsApps\python.exe   ← 0 字节的商店占位符
+python -c "print(1)"; $LASTEXITCODE   # 9009 = 命令不存在
+```
+
+处理三步：
+
+```powershell
+# 1) 装真 Python（已装可跳过）
+winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
+
+# 2) 重开一个 PowerShell 窗口，确认版本
+python --version          # 期望 3.12.x
+
+# 3) 建虚拟环境并装依赖（仓库根目录执行）
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install -r requirements/base.txt
+```
+
+重开窗口后仍指向 `WindowsApps` 的话，去「设置 → 应用 → 高级应用设置 → 应用执行别名」，
+把 `python.exe` / `python3.exe` 两个开关关掉，再重开终端。
+
+**每次开工先激活虚拟环境**，之后所有 `python` 命令都会用 `.venv` 里的解释器与依赖：
+
+```powershell
+cd C:\space\AI学习\ai-engineer-8week-tracker
+.\.venv\Scripts\Activate.ps1
+python -m pytest tests -q
+```
+
+不想激活也可以直接用全路径：`.\.venv\Scripts\python.exe -m pytest tests -q`。
