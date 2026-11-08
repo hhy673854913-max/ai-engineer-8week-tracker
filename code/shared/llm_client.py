@@ -49,9 +49,13 @@ class LLMConfig:
     provider: str = "custom"
     timeout: float = 60.0
     max_retries: int = 3
-    # 价格单位：元 / 百万 token。默认值仅作示例，请按官方价格修改。
+    # 价格单位：元 / 百万 token。默认值仅作示例，请按官方价格修改（或设 LLM_PRICE_IN/OUT）。
     price_in: float = 2.0
     price_out: float = 8.0
+    # 兼容性开关：Kimi K3.1 Pro 的 temperature/top_p 是固定值，不能显式传；
+    # 它的输出上限字段叫 max_completion_tokens 而不是 max_tokens。
+    supports_temperature: bool = True
+    max_tokens_field: str = "max_tokens"
 
     def __post_init__(self) -> None:
         if not self.base_url.startswith("http"):
@@ -61,7 +65,7 @@ class LLMConfig:
 
 
 # 各家的默认端点与模型名，可用环境变量覆盖。
-PROVIDERS: dict[str, dict[str, str]] = {
+PROVIDERS: dict[str, dict[str, object]] = {
     "deepseek": {
         "key_env": "DEEPSEEK_API_KEY",
         "base_env": "DEEPSEEK_BASE_URL",
@@ -82,6 +86,16 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "model_env": "ZHIPU_MODEL",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
         "model": "glm-4-air",
+    },
+    # Kimi（Moonshot）：OpenAI 兼容；K3.1 Pro 固定 temperature/top_p，且用 max_completion_tokens
+    "moonshot": {
+        "key_env": "MOONSHOT_API_KEY",
+        "base_env": "MOONSHOT_BASE_URL",
+        "model_env": "MOONSHOT_MODEL",
+        "base_url": "https://api.moonshot.cn/v1",
+        "model": "kimi-k3.1-pro",
+        "supports_temperature": False,
+        "max_tokens_field": "max_completion_tokens",
     },
 }
 
@@ -112,26 +126,35 @@ def load_config(provider: str | None = None) -> LLMConfig:
     provider = provider or os.getenv("LLM_PROVIDER", "deepseek")
     provider = provider.lower()
 
+    price_in = float(os.getenv("LLM_PRICE_IN", "2.0"))
+    price_out = float(os.getenv("LLM_PRICE_OUT", "8.0"))
+
     if provider == "openai":
         return LLMConfig(
             provider="openai",
             base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             api_key=os.getenv("OPENAI_API_KEY", ""),
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            price_in=price_in,
+            price_out=price_out,
         )
 
     if provider not in PROVIDERS:
         raise ConfigError(f"未知 provider: {provider}，可选: {', '.join(PROVIDERS)} / openai")
 
     spec = PROVIDERS[provider]
-    api_key = os.getenv(spec["key_env"], "")
+    api_key = os.getenv(str(spec["key_env"]), "")
     if not api_key:
         raise ConfigError(f"未设置 {spec['key_env']}，请复制 .env.example 为 .env 并填写")
     return LLMConfig(
         provider=provider,
-        base_url=os.getenv(spec["base_env"], spec["base_url"]),
+        base_url=os.getenv(str(spec["base_env"]), str(spec["base_url"])),
         api_key=api_key,
-        model=os.getenv(spec["model_env"], spec["model"]),
+        model=os.getenv(str(spec["model_env"]), str(spec["model"])),
+        price_in=price_in,
+        price_out=price_out,
+        supports_temperature=bool(spec.get("supports_temperature", True)),
+        max_tokens_field=str(spec.get("max_tokens_field", "max_tokens")),
     )
 
 
@@ -202,6 +225,29 @@ def _backoff(attempt: int, base: float = 1.0, cap: float = 8.0) -> float:
     return min(base * (2**attempt), cap) + random.uniform(0, 0.3)
 
 
+def request_params(config: LLMConfig, messages: Iterable[dict], **kwargs: Any) -> dict[str, Any]:
+    """按供应商差异组装请求参数。
+
+    两家已知差异：
+    - Kimi K3.1 Pro 的 temperature/top_p 是固定值，显式传会被拒绝 → 直接丢弃
+    - Kimi 用 max_completion_tokens 表示输出上限 → 自动改名
+    """
+    params: dict[str, Any] = {
+        "model": kwargs.pop("model", config.model),
+        "messages": list(messages),
+    }
+    if config.supports_temperature:
+        params["temperature"] = kwargs.pop("temperature", 0.3)
+    else:
+        kwargs.pop("temperature", None)
+
+    if config.max_tokens_field != "max_tokens" and "max_tokens" in kwargs:
+        kwargs[config.max_tokens_field] = kwargs.pop("max_tokens")
+
+    params.update(kwargs)
+    return params
+
+
 class LLMClient:
     """同步 + 异步 + 流式三合一的客户端。"""
 
@@ -244,13 +290,7 @@ class LLMClient:
         )
 
     def _params(self, messages: Iterable[dict], **kwargs: Any) -> dict[str, Any]:
-        params = {
-            "model": kwargs.pop("model", self.config.model),
-            "messages": list(messages),
-            "temperature": kwargs.pop("temperature", 0.3),
-        }
-        params.update(kwargs)
-        return params
+        return request_params(self.config, messages, **kwargs)
 
     # -- 同步 -----------------------------------------------------------
     def chat(self, messages: Iterable[dict], **kwargs: Any) -> ChatResult:

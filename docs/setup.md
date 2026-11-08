@@ -37,16 +37,20 @@ pip install -r requirements/base.txt
 
 ## 2. 申请模型 API Key
 
-三个方案任选其一，代码通过 `.env` 切换，不改业务代码。
+四个方案任选其一，代码通过 `.env` 切换，不改业务代码。
 
 | 方案 | 适合 | 注册入口 | 备注 |
 | --- | --- | --- | --- |
 | DeepSeek | 起步首选，便宜 | platform.deepseek.com | `deepseek-chat` 足够跑完 W1-W6 |
 | 阿里云百炼 | 需要视觉 + 嵌入 | bailian.console.aliyun.com | `qwen-vl-max`（Day 09）、`text-embedding-v3`（Day 11） |
 | 智谱 GLM | 备选 | open.bigmodel.cn | 有免费额度 |
+| Kimi / Moonshot | 长上下文、代码与 Agent 强 | platform.kimi.com | `kimi-k3.1-pro`（1M 上下文）；无 embedding 接口 |
 
-三家都提供 **OpenAI 兼容接口**，所以代码里统一用 `openai` SDK + `base_url` 即可，这也是第 1 周要建立的认知：
+四家都提供 **OpenAI 兼容接口**，所以代码里统一用 `openai` SDK + `base_url` 即可，这也是第 1 周要建立的认知：
 **"模型厂商"是可替换的，你的工程封装才是资产。**
+
+> Kimi 的两个差异已由 `code/shared/llm_client.py` 自动处理：K3.1 Pro 的 `temperature/top_p` 是固定值不能显式传，
+> 输出上限字段叫 `max_completion_tokens`。另外 K2 系列已对新人关闭、年底下线，直接用 K3.1 系列即可。
 
 ## 3. 配置 `.env`
 

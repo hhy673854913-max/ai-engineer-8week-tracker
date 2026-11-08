@@ -148,7 +148,7 @@ python scripts/checkin.py --status  # 查看 40 天进度
 
 ## 技术栈
 
-`Python 3.11+` · `uv` · `openai SDK`（兼容 DeepSeek / 通义千问 / 智谱）· `Pydantic` · `FastAPI`
+`Python 3.11+` · `uv` · `openai SDK`（兼容 DeepSeek / 通义千问 / 智谱 / Kimi）· `Pydantic` · `FastAPI`
 · `Chroma` · `BM25 + RRF` · `LangChain` · `LangGraph` · `MCP` · `RAGAS` · `Docker`
 
 ---
