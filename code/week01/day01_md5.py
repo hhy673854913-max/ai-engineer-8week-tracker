@@ -21,49 +21,62 @@ ALGOS = ("md5", "sha1", "sha256")
 
 
 def file_digest(path: Path, algo: str = "md5", chunk_size: int = 1 << 20) -> str:
-    """分块读取并计算哈希，避免大文件一次性读入内存。"""
+    """分块读取并计算哈希，避免大文件一次性读入内存。
+
+    chunk_size 默认 1MB（1 << 20），任何时候内存中只有一块数据，
+    因此 GB 级文件也能安全处理。
+    """
     h = hashlib.new(algo)
-    with path.open("rb") as f:
+    with path.open("rb") as f:  # 以二进制只读模式打开；with 保证文件最终关闭
+        # iter(调用函数, 哨兵值)：反复调用 lambda，直到返回值等于 b""（文件读完）才停止。
+        # 必须用 lambda 包一层，让 f.read 在“每次迭代时”执行；
+        # 若直接写 f.read(chunk_size)，会在传参那一刻立刻执行，只读一次。
         for chunk in iter(lambda: f.read(chunk_size), b""):
-            h.update(chunk)
+            h.update(chunk)  # 增量更新哈希，逐块累积
     return h.hexdigest()
 
 
 def scan(root: Path, algo: str = "md5") -> dict:
     """遍历目录，返回文件清单与重复组。"""
-    files: list[dict] = []
-    by_size: dict[int, list[Path]] = defaultdict(list)
-    skipped: list[dict] = []
+    # 初始化三个容器：分别存放所有文件清单、按大小分组的索引、读取失败的记录
+    files: list[dict] = []                          # 所有文件的元信息列表
+    by_size: dict[int, list[Path]] = defaultdict(list)  # 大小 → 该大小的文件路径列表
+    skipped: list[dict] = []                        # 无法访问的文件及原因
 
-    for p in root.rglob("*"):
-        if not p.is_file():
+    # 第一阶段：递归遍历目录，收集文件元数据
+    for p in root.rglob("*"):                       # rglob("*") 递归遍历所有子目录
+        if not p.is_file():                         # 跳过目录、符号链接等非文件项
             continue
         try:
-            st = p.stat()
-        except OSError as exc:
+            st = p.stat()                           # 获取文件状态（大小、修改时间等）
+        except OSError as exc:                      # 权限不足/文件被占用等系统错误
             skipped.append({"path": str(p), "reason": str(exc)})
             continue
         files.append({"path": str(p), "size": st.st_size, "mtime": st.st_mtime})
-        by_size[st.st_size].append(p)
+        by_size[st.st_size].append(p)               # 按大小分组，为后续快速筛选做准备
 
-    # 第一层去重：大小相同才可能重复，避免对大文件全量算哈希
-    digests: dict[tuple[int, str], list[str]] = defaultdict(list)
-    for size, paths in by_size.items():
-        if len(paths) < 2 or size == 0:
+    # 第二层去重：仅对大小相同（≥2个）的文件计算哈希，避免全量哈希计算
+    digests: dict[tuple[int, str], list[str]] = defaultdict(list)  # (大小, 哈希) → 路径列表
+    for size, paths in by_size.items():             # 遍历每个大小分组
+        if len(paths) < 2 or size == 0:             # 单文件组不可能重复；空文件内容相同无意义
             continue
         for p in paths:
             try:
-                digests[(size, file_digest(p, algo))].append(str(p))
-            except OSError as exc:
+                digest = file_digest(p, algo)       # 分块计算文件哈希
+                digests[(size, digest)].append(str(p))  # 相同(大小,哈希) → 确认为重复
+            except OSError as exc:                  # 读取失败（权限/占用等）
                 skipped.append({"path": str(p), "reason": str(exc)})
 
+    # 筛选出真正的重复组（同大小同哈希且路径数≥2），按可节省空间降序排列
     duplicates = [
         {"algo": algo, "size": size, "digest": digest, "paths": paths}
         for (size, digest), paths in digests.items()
         if len(paths) > 1
     ]
+    # 排序键：文件大小 × (份数-1) = 删除冗余后可回收的空间，从大到小展示
     duplicates.sort(key=lambda d: d["size"] * (len(d["paths"]) - 1), reverse=True)
 
+    # 统计总浪费空间（每组只保留一份，其余视为浪费）
     wasted = sum(d["size"] * (len(d["paths"]) - 1) for d in duplicates)
     return {
         "root": str(root),
@@ -75,7 +88,6 @@ def scan(root: Path, algo: str = "md5") -> dict:
         "duplicates": duplicates,
         "skipped": skipped,
     }
-
 
 def human(n: int) -> str:
     for unit in ("B", "KB", "MB", "GB", "TB"):
