@@ -104,6 +104,9 @@ def embed(texts: list[str], model: str = "text-embedding-v3") -> list[list[float
 
 注意：`dimensions` 参数不是所有厂商都支持，不支持就删掉。批量接口一次最多 10–25 条，要看文档。
 
+> 仓库里的 `code/week03/mini_rag/embeddings.py` 读的是独立的 `EMBED_*` 变量，所以"Kimi 聊天 + 百炼嵌入"
+> 这种混搭可以直接用；聊天厂商不支持 embedding 时它会给明确提示，而不是抛一个 404。
+
 ### 任务 3 · 相似度实验（60 min）
 
 准备 8 个句子（3 组近似 + 2 个离群），做三件事：

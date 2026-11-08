@@ -52,6 +52,18 @@ pip install -r requirements/base.txt
 > Kimi 的两个差异已由 `code/shared/llm_client.py` 自动处理：K3.1 Pro 的 `temperature/top_p` 是固定值不能显式传，
 > 输出上限字段叫 `max_completion_tokens`。另外 K2 系列已对新人关闭、年底下线，直接用 K3.1 系列即可。
 
+**聊天和嵌入可以不是同一家。** Kimi、DeepSeek 都没有 embedding 接口，Day 11 要做真向量检索时，
+单独配一段 `EMBED_*` 即可（例如聊天用 Kimi、嵌入用百炼）：
+
+```ini
+EMBED_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+EMBED_API_KEY=sk-你的百炼Key
+EMBED_MODEL=qwen3.7-text-embedding
+EMBED_DIMENSIONS=1024
+```
+
+代码优先读 `EMBED_*`，没配才回退到聊天配置；回退到不支持 embedding 的厂商时会给出明确提示。
+
 ## 3. 配置 `.env`
 
 ```powershell
