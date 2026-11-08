@@ -117,6 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dir", type=Path, default=Path("."), help="要扫描的目录")
     parser.add_argument("--algo", choices=ALGOS, default="md5")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
+    parser.add_argument("--min-size", type=int, default=0, help="只报告大于等于该字节数的重复组")
+    # scan 之后、render 之前，过滤 report["duplicates"]，并重算 wasted_bytes
+
     args = parser.parse_args(argv)
 
     if not args.dir.exists():
@@ -130,6 +133,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
+        # 过滤重复组，只保留大于等于 min_size 的
+        report["duplicates"] = [d for d in report["duplicates"] if d["size"] >= args.min_size]
+        report["wasted_bytes"] = sum(d["size"] * (len(d["paths"]) - 1) for d in report["duplicates"])
+
         print(render(report))
         print(f"\n耗时 {report['elapsed_ms']} ms")
     return 0
