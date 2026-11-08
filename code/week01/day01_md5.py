@@ -17,6 +17,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+from file_walker import SKIP_DIRS, walk_files  # 复用公共遍历函数
+
 ALGOS = ("md5", "sha1", "sha256")
 
 
@@ -36,17 +38,15 @@ def file_digest(path: Path, algo: str = "md5", chunk_size: int = 1 << 20) -> str
     return h.hexdigest()
 
 
-def scan(root: Path, algo: str = "md5") -> dict:
+def scan(root: Path, algo: str = "md5", include_hidden: bool = False) -> dict:
     """遍历目录，返回文件清单与重复组。"""
     # 初始化三个容器：分别存放所有文件清单、按大小分组的索引、读取失败的记录
     files: list[dict] = []                          # 所有文件的元信息列表
     by_size: dict[int, list[Path]] = defaultdict(list)  # 大小 → 该大小的文件路径列表
     skipped: list[dict] = []                        # 无法访问的文件及原因
 
-    # 第一阶段：递归遍历目录，收集文件元数据
-    for p in root.rglob("*"):                       # rglob("*") 递归遍历所有子目录
-        if not p.is_file():                         # 跳过目录、符号链接等非文件项
-            continue
+    # 第一阶段：递归遍历目录（公共函数，自动剪枝），收集文件元数据
+    for p in walk_files(root, include_hidden=include_hidden):
         try:
             st = p.stat()                           # 获取文件状态（大小、修改时间等）
         except OSError as exc:                      # 权限不足/文件被占用等系统错误
@@ -118,8 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--algo", choices=ALGOS, default="md5")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     parser.add_argument("--min-size", type=int, default=0, help="只报告大于等于该字节数的重复组")
-    # scan 之后、render 之前，过滤 report["duplicates"]，并重算 wasted_bytes
-
+    parser.add_argument("--include-hidden", action="store_true", help="包含隐藏目录（以 . 开头）")
     args = parser.parse_args(argv)
 
     if not args.dir.exists():
@@ -127,16 +126,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     t0 = time.perf_counter()
-    report = scan(args.dir, args.algo)
+    report = scan(args.dir, args.algo, include_hidden=args.include_hidden)
     report["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
+
+    # 过滤重复组，只保留大于等于 min_size 的
+    report["duplicates"] = [d for d in report["duplicates"] if d["size"] >= args.min_size]
+    report["wasted_bytes"] = sum(d["size"] * (len(d["paths"]) - 1) for d in report["duplicates"])
+
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
-        # 过滤重复组，只保留大于等于 min_size 的
-        report["duplicates"] = [d for d in report["duplicates"] if d["size"] >= args.min_size]
-        report["wasted_bytes"] = sum(d["size"] * (len(d["paths"]) - 1) for d in report["duplicates"])
-
         print(render(report))
         print(f"\n耗时 {report['elapsed_ms']} ms")
     return 0

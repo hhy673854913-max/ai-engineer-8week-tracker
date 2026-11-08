@@ -16,13 +16,17 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-import os
 
-def scan(root: Path, sort: str = "desc") -> dict:
+from file_walker import SKIP_DIRS, walk_files  # 复用公共遍历函数
+
+def scan(root: Path, sort: str = "desc", include_hidden: bool = False, min_size: int = 0) -> dict:
     """统计当前目录下每个扩展名的总大小
 
     返回的 report["extensions"] 是按总大小排序后的列表，每项：
         {"ext": ".py", "files": 文件数, "bytes": 总字节数}
+
+    - include_hidden: 是否进入隐藏目录（以 . 开头）
+    - min_size: 只统计大于等于该字节数的文件
     """
     # 键为扩展名（小写，无扩展名归为 ""），值累积该扩展名的文件数与总字节
     stats: dict[str, dict] = defaultdict(lambda: {"files": 0, "bytes": 0})
@@ -30,35 +34,20 @@ def scan(root: Path, sort: str = "desc") -> dict:
     total_bytes = 0
     skipped: list[dict] = []
 
-    # 遍历方式对比（实测 1000 个文件，Windows）：
-    #
-    # 1) os.scandir（当前选择，推荐）
-    #    目录遍历时 OS 一次性返回文件名 + 元数据缓存到 DirEntry，
-    #    后续 entry.stat() 直接读缓存，零额外系统调用。
-    #    实测 1000 文件 ≈ 2 ms。
-    #
-    # 2) Path.iterdir + Path.stat()（旧写法）
-    #    iterdir 只返回 Path 对象，每次 p.stat() 都要重新发起
-    #    stat 系统调用，N 个文件 = N 次系统调用。
-    #    实测 1000 文件 ≈ 28 ms，比 scandir 慢约 15 倍。
-    #
-    # 3) Path.rglob("*")（递归场景）
-    #    递归遍历所有子目录，内部仍逐文件 stat，同样受系统调用开销影响。
-    #    若需递归 + 高性能，可用 os.walk（内部使用 scandir）。
-    with os.scandir(root) as entries:
-        for entry in entries:  # 只遍历当前层，不递归子目录
-            if not entry.is_file():
-                continue
-            try:
-                size = entry.stat().st_size  # 利用 DirEntry 缓存，比 Path.stat() 快
-            except OSError as exc:  # 无权限/被占用等，记录后跳过
-                skipped.append({"path": entry.path, "reason": str(exc)})
-                continue
-            ext = Path(entry.name).suffix.lower()  # 取扩展名，如 ".PY" → ".py"；无扩展名则为 ""
-            stats[ext]["files"] += 1
-            stats[ext]["bytes"] += size
-            total_files += 1
-            total_bytes += size
+    # 复用公共遍历函数（自动剪枝 SKIP_DIRS，可选包含隐藏目录）
+    for p in walk_files(root, include_hidden=include_hidden):
+        try:
+            size = p.stat().st_size
+        except OSError as exc:  # 无权限/被占用等，记录后跳过
+            skipped.append({"path": str(p), "reason": str(exc)})
+            continue
+        if size < min_size:  # --min-size 过滤
+            continue
+        ext = p.suffix.lower()  # 取扩展名，如 ".PY" → ".py"；无扩展名则为 ""
+        stats[ext]["files"] += 1
+        stats[ext]["bytes"] += size
+        total_files += 1
+        total_bytes += size
 
     # 按总大小排序，sort="desc" 降序（默认），"asc" 升序
     extensions = [
@@ -104,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     # 升序还是降序
     parser.add_argument("--sort", choices=["asc", "desc"], default="desc", help="排序方式")
     parser.add_argument("--num", type=int, default=5, help="按总大小输出前 N 名扩展名")
+    parser.add_argument("--min-size", type=int, default=0, help="只统计大于等于该字节数的文件")
+    parser.add_argument("--include-hidden", action="store_true", help="包含隐藏目录（以 . 开头）")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     args = parser.parse_args(argv)
 
@@ -112,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     t0 = time.perf_counter()
-    report = scan(args.dir, args.sort)
+    report = scan(args.dir, args.sort, include_hidden=args.include_hidden, min_size=args.min_size)
     report["extensions"] = report["extensions"][: args.num]  # 只保留前 N 名
     report["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
 
