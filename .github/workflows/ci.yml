@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/ci.txt
+
+      - name: Lint (syntax / undefined names)
+        run: ruff check code tests --select E9,F63,F7,F82
+
+      - name: Unit tests (no API key required)
+        run: python -m pytest tests -q
+
+      - name: Offline smoke — M1 pipeline
+        run: python code/week02/m1_brief/pipeline.py --mock --limit 5
+
+      - name: Offline smoke — mini RAG
+        run: |
+          python -m code.week03.mini_rag.cli index --docs data/kb_sample --offline
+          python -m code.week03.mini_rag.cli query "退款多久到账" --offline
+
+      - name: Offline smoke — M3 assistant
+        run: python -m code.week08.activity_assistant.demo --offline

@@ -1,0 +1,72 @@
+[
+  {
+    "source": "官方公告",
+    "url": "https://example.com/news/2026-spring-activity",
+    "title": "2026 春节活动定档：双人组队玩法上线",
+    "content": "官方今日宣布，2026 春节活动将于 2 月 1 日开启，持续 14 天。活动采用双人组队玩法，玩家可与好友组队完成每日任务，累计积分兑换限定皮肤。奖励将在活动结束后 7 个工作日内发放。",
+    "published_at": "2026-11-07T09:00:00"
+  },
+  {
+    "source": "36氪",
+    "url": "https://example.com/news/model-embeddings?utm_source=rss",
+    "title": "国内厂商发布新一代中文嵌入模型，检索准确率提升 12%",
+    "content": "该模型在中文语义检索基准上较上一代提升 12%，支持 1024 维向量输出，单条文本成本下降 40%。目前已开放 API 调用。",
+    "published_at": "2026-11-07T14:30:00"
+  },
+  {
+    "source": "机器之心",
+    "url": "https://example.com/news/agent-framework",
+    "title": "开源 Agent 框架新增状态持久化能力",
+    "content": "新版本支持检查点与人工介入，开发者可以在危险操作前中断流程，等待人工确认后继续执行。官方称该能力面向生产环境。",
+    "published_at": "2026-11-06T10:15:00"
+  },
+  {
+    "source": "量子位",
+    "url": "https://example.com/news/rag-eval",
+    "title": "研究显示：多数 RAG 系统的瓶颈在检索而非生成",
+    "content": "一项针对 200 个企业知识库的调研显示，68% 的答错案例根因是检索未召回，而非模型生成能力不足。研究者建议优先优化分块与混合检索。",
+    "published_at": "2026-11-06T18:00:00"
+  },
+  {
+    "source": "自媒体",
+    "url": "https://example.com/news/hot-take",
+    "title": "AI 将取代前端？聊聊我看到的真实情况",
+    "content": "最近很多讨论说 AI 会取代前端。结合我自己的观察，真正被替代的是重复的页面搭建，而不是工程判断与体验设计。",
+    "published_at": "2026-11-05T21:40:00"
+  },
+  {
+    "source": "官方公告",
+    "url": "https://example.com/news/2026-spring-activity-copy",
+    "title": "2026 春节活动定档：双人组队玩法上线（转载）",
+    "content": "官方今日宣布，2026 春节活动将于 2 月 1 日开启，持续 14 天。活动采用双人组队玩法，玩家可与好友组队完成每日任务，累计积分兑换限定皮肤。奖励将在活动结束后 7 个工作日内发放。",
+    "published_at": "2026-11-07T09:05:00"
+  },
+  {
+    "source": "GameLook",
+    "url": "https://example.com/news/game-ai-tools",
+    "title": "游戏公司开始用 AI 工具压缩活动交付周期",
+    "content": "多家游戏公司披露，通过 AI 生成活动页骨架，单活动交付周期从 3 天压缩到 1 天，人力投入下降约 60%。",
+    "published_at": "2026-11-04T11:20:00"
+  },
+  {
+    "source": "36氪",
+    "url": "https://example.com/news/funding",
+    "title": "某 AI 应用公司完成 A 轮融资，估值 8 亿元",
+    "content": "本轮融资由产业基金领投，资金将用于产品研发与行业解决方案落地。公司称已服务 200 家企业客户。",
+    "published_at": "2026-11-03T09:00:00"
+  },
+  {
+    "source": "官方公告",
+    "url": "https://example.com/news/policy",
+    "title": "生成式 AI 服务管理办法更新，新增标识要求",
+    "content": "新规要求生成式 AI 服务对生成内容进行显著标识，并保存日志不少于 6 个月。办法自 2027 年 1 月 1 日起施行。",
+    "published_at": "2026-11-02T16:00:00"
+  },
+  {
+    "source": "机器之心",
+    "url": "https://example.com/news/mcp",
+    "title": "MCP 协议生态扩张，主流 IDE 已支持",
+    "content": "Model Context Protocol 已被多款主流 IDE 与桌面客户端支持，开发者可通过一个 Server 向多个客户端暴露工具与资源。",
+    "published_at": "2026-11-01T08:00:00"
+  }
+]

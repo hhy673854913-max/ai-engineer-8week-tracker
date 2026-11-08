@@ -1,0 +1,8 @@
+# 第 3-4 周：RAG
+chromadb>=0.5
+langchain>=0.3
+langchain-openai>=0.2
+langchain-community>=0.3
+jieba>=0.42
+# 本地重排/嵌入（可选，体积较大；也可走 API）
+# sentence-transformers>=3.0

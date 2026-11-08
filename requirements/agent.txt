@@ -1,0 +1,4 @@
+# 第 5-6 周：Agent / MCP
+langgraph>=0.2
+langchain-core>=0.3
+mcp>=1.2

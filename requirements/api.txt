@@ -1,0 +1,4 @@
+# 第 7 周：服务化
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sse-starlette>=2.1

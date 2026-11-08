@@ -1,0 +1,7 @@
+# 第 1-2 周基础依赖
+openai>=1.60
+httpx>=0.27
+pydantic>=2.7
+python-dotenv>=1.0
+tenacity>=9.0
+rich>=13.7

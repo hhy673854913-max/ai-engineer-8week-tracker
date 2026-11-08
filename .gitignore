@@ -1,0 +1,43 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- 密钥与本地配置 ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ---- 数据与产物（体积大 / 含隐私）----
+data/raw/
+data/processed/
+chroma_db/
+.mini_rag_index/
+.chroma_kb/
+runs/
+*.sqlite3
+*.log
+logs/*.tmp
+output/
+cache/
+
+# ---- 编辑器与系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Notebook ----
+.ipynb_checkpoints/
