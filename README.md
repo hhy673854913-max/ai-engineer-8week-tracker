@@ -6,6 +6,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Days](https://img.shields.io/badge/days-40-blue)
+[![CI](https://github.com/hhy673854913-max/ai-engineer-8week-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/hhy673854913-max/ai-engineer-8week-tracker/actions/workflows/ci.yml)
 
 ---
 
