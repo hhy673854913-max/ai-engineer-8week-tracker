@@ -47,6 +47,8 @@ def get_service(request: Request) -> QAService:
 
 **不要在路由里 `QAService()`**：每次请求都重新加载索引，1 秒起步，还会打爆内存。
 
+上面那段代码里的角色分工：`Depends` 是 FastAPI 的依赖注入：你在函数签名里声明"这个接口需要一个 QAService"，FastAPI 在每次请求进来时调用 `get_service`，把 lifespan 里建好的那个实例作为参数传进来，路由函数里就不用自己 import 全局对象。好处有两个：取 service 的逻辑只有一处，以后要按请求注入 db session、当前用户、trace_id 都是同一套写法；测试时用 `app.dependency_overrides[get_service]` 换成假 service，不加载真索引就能跑接口测试——面试被问"你们服务怎么做单测"时，答的就是这一句。
+
 ### 3. 三个必踩的坑
 
 **坑 1：阻塞事件循环**

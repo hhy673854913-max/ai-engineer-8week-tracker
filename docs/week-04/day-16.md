@@ -41,6 +41,8 @@
 模型层：`ChatOpenAI`（兼容任何 OpenAI 协议端点）。
 输出层：`StrOutputParser`、`JsonOutputParser`、`PydanticOutputParser`。
 
+三个 Parser 的选择线：`StrOutputParser` 只要纯文本；`JsonOutputParser` 只保证输出是合法 JSON，字段对不对不管；`PydanticOutputParser` 会把 JSON 直接校验成你第 1 周写的那个 `BaseModel`，字段缺失或类型错立刻报错——Day 22 让模型返回工具调用参数、Day 30 让多个 Agent 交换结构化结果，用的都是它。选错的典型事故是：下游 `data["tool_args"]` 拿到的是字符串不是 dict，直到线上才炸。
+
 ### 3. LCEL：用管道符组合
 
 ```python
@@ -53,6 +55,8 @@ result = chain.invoke({"question": "退款多久到账"})
 - 前面输出 `dict` → 后面要能接收 `dict`（通常是 `ChatPromptTemplate`）
 - 中间要透传输入 → `RunnablePassthrough`
 - 要并行分支 → `RunnableParallel`
+
+先把定义补上：**LCEL（LangChain Expression Language）是 LangChain 的链式编排 DSL**：凡是实现了 `Runnable` 协议的对象（提示词、模型、检索器、普通函数）都能用 `|` 拼成一条链，并自动获得 `invoke / batch / stream / astream` 四种调用方式——你在 M2 里做到「同一个问答逻辑既能跑评测批处理、又能给前端流式吐字」，靠的就是这层协议。面试被问「LangChain 和 LangGraph 什么关系」时，标准答法就是：LCEL 负责线性组合，LangGraph 负责有状态的分支与循环。
 
 ### 4. RAG 链的两种写法
 

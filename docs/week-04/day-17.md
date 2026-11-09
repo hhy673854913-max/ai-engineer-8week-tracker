@@ -56,6 +56,8 @@ class AppConfig(BaseModel):
 | `RunnableBranch` | 条件路由 | 有历史 → 改写；无历史 → 原样 |
 | `RunnablePassthrough.assign` | 透传并追加字段 | 在输入里加 `retrieved_docs` |
 
+落到岗位上：这四个件不是 LangChain 的语法糖，而是 Agent 编排的四种基本动作：`RunnableParallel` 对应「一次问三个改写后的 query / 并行调两个工具」；`RunnableBranch` 对应「有历史就改写、没历史就原样」的路由决策，Day 24 LangGraph 的条件边就是把它画进了图里；`RunnablePassthrough.assign` 对应「给 Agent 的状态追加检索结果」。面试被问「你怎么做条件路由和多路召回」，答的就是这四个动作的取舍与代价。
+
 ### 4. 可配置链的结构
 
 ```text
@@ -80,6 +82,8 @@ def build_chain(cfg: RetrievalConfig):
 
 **不要为了用 LCEL 而用 LCEL**：如果链里全是 `RunnableLambda`，说明你其实在写普通函数。
 判断标准：**LCEL 适合"线性 + 并行"的组合，复杂分支用普通 Python 更清楚。**
+
+`compose` 不是 LangChain 提供的函数，可变长链要自己拼：`from functools import reduce; chain = reduce(lambda a, b: a | b, steps)`（等价于手动构造 `RunnableSequence`）。但生产代码里更常见的是任务 2 那种手写 `if`——因为「哪几步开着」本质是业务分支，用 `if` 更好读、更好打日志、更好做灰度；LangGraph（Day 24）做的事就是把这堆 `if` 显式画成图，让状态和回放可控。面试被问「为什么不全用链式」，这就是你的答案。
 
 ### 5. 可复现：把配置和结果一起存
 

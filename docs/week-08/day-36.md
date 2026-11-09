@@ -26,6 +26,8 @@ code/week08/activity_assistant/
 └─ demo.py          # 端到端演示
 ```
 
+落到路径上：`code/week08/` 是仓库里的物理目录，`week08` 才是包名，所以 `python -m` 必须在 `code/` 目录下执行（或把 `code/` 加进 `PYTHONPATH`）；每个子目录里的 `__init__.py` 不是摆设，它让 Python 把文件夹当包处理，缺了它 `from .models import Requirement` 会直接报错。面试官 clone 你的仓库时第一件事就是跑这条命令，跑不起来，后面三个项目都不用看了。
+
 ### 2. 从"能跑"到"可验收"
 
 每个角色的输出都必须通过 Pydantic 校验：
@@ -36,6 +38,8 @@ def analyst(state: M3State) -> dict:
     req = Requirement.model_validate_json(extract_json(raw))
     return {"requirement": req, "timeline": state["timeline"] + [{"step": "analyst", "ts": now()}]}
 ```
+
+落到入口上：初始 state 由一个入口节点写死，`graph.invoke({"raw_requirement": req, "timeline": [], "round": 0})`，所以要先在 `M3State` 里补上 `raw_requirement: str`，并把 `requirement` 放宽成 `Requirement | None`。校验别让它直接抛：复用 Day 05 的 `generate_with_retry`（`shared/structured.py`），把字段错误当成澄清线索回传，两次修不好就写进 `missing` 走 clarify 分支，而不是让整条流水线崩掉——M3 的"一次通过率 65%"这个面试数字，就是从这条链路里量出来的。
 
 ### 3. 澄清分支：不要假装什么都能做
 
@@ -53,6 +57,8 @@ def clarify(state: M3State) -> dict:
 ```
 
 **`interrupt` 是 M3 的关键**：它证明你懂"AI 做初稿、人做决策"，而不是盲目自动化。
+
+把线接全：`clarifications` 要拼进 analyst 的 prompt（"以下信息已由运营确认：{clarifications}，不要重复问"），并在 `interrupt` 旁边写全三件事：编译时 `checkpointer=MemorySaver()`、调用时带固定 `thread_id`、恢复时 `Command(resume={"answers": [...]})`。演示视频里把这条"机器停住等人回答"的路径录进去——HITL 是面试官判断你懂不懂企业落地的分水岭，而它恰好最容易被讲成"我加了个 input()"。
 
 ### 4. 代码生成的工程约束
 
@@ -80,6 +86,8 @@ def rule_checks(html: str) -> list[dict]:
 ```
 
 **规则能查的，不要花 LLM 的钱**。LLM 只负责"业务合理性"这类规则查不了的部分。
+
+落到解析器上：`lxml` 是 Python 的 HTML/XML 解析库，作用和浏览器里的 `DOMParser` 一样：把字符串变成一棵可查询的 DOM 树，好处是能用 XPath 选节点做规则检查，不用拿正则去啃标签。但它的 `HTMLParser` 走的是容错路线，想真抓"未闭合标签"，得自己比对标签栈或用 `lxml.html` 解析后检查异常节点，否则你那条"硬错误一票否决"永远哑火——面试问"你怎么保证生成代码可运行"，答"我用解析器校验过"和答"我以为解析器会校验"，中间差的就是这一句。
 
 ---
 

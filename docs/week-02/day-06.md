@@ -115,6 +115,8 @@ def run_experiment(prompt_id: str, cases: list[dict]) -> list[dict]:
 
 输出 CSV 到 `output/prompt_exp_YYYYMMDD.csv`，方便你横向对比（也可以用 Excel 手写评分）。
 
+落到 M1 上，这张表不是一次性作业：Day 08 迭代 M1 抽取模板时直接复用 `run_experiment`，把样本换成 20 条资讯正文、打分标准不变，用来对比 v1/v2；到 M1 交付你手上会有一张『prompt 版本 × 字段准确率 × 单条成本』的表，面试时它比『我会写提示词』有说服力得多。
+
 ---
 
 ## 代码思考（写进 `logs/day-06.md`）

@@ -21,6 +21,8 @@
 一个可直接迁移的认知：**Python 的包管理 ≈ npm，但更分散**。npm 只有一套（package.json + node_modules），
 Python 有 pip / venv / conda / poetry / uv 多套并存——这就是为什么第一课先讲环境。
 
+具体到岗位：RAG 的向量库与 embedding 客户端、Agent 编排（LangGraph）、评估（RAGAS）、服务化（FastAPI）在 Python 侧都是一等公民，M1/M2/M3 的交付物也全是 Python 服务。你不是要从头学一门语言，而是要把 AI 能力包成 Python 服务、再接回你最强的 React 界面。
+
 ### 2. 环境三件套
 
 | 概念 | 作用 | 类比前端 |
@@ -65,6 +67,8 @@ uv pip list                    # 看装了什么
 | `throw new Error()` | `raise ValueError()` | 用内置异常类型 |
 | `console.log` | `print` / `logging` | 生产代码用 logging |
 
+这张表至少三行在 Agent 代码里天天出现：模型返回的 `tool_calls[0].function.arguments` 是 JSON 字符串，`json.loads` 之后就是 `d["name"]` / `d.get("arguments", "{}")`；`messages` 是 `list[dict]`，追加一轮对话就是 `messages.append({"role": "user", ...})`。敲完表顺手写个 `parse_tool_args(raw: str) -> dict`，这是第 5 周工具调用的第一块砖。
+
 ### 4. 五个会咬人的差异（今天就记住）
 
 1. **可变默认参数**：`def f(items=[])` 的 `[]` 只创建一次，所有调用共享。
@@ -76,6 +80,8 @@ uv pip list                    # 看装了什么
 3. **`is` 不是 `===`**：`is` 比较内存地址。`a is None` 是惯用法，`a is 1` 是 bug（小整数缓存会让你偶尔"碰巧对"）。
 4. **整数除法**：`/` 永远返回 float，整除用 `//`；`7 / 2 == 3.5`。
 5. **模块名撞车**：本地文件 `random.py`、`json.py` 会遮蔽标准库，报一个莫名其妙的错。命名避开标准库。
+
+这两个坑在 Agent 里是事故级的：工具函数写 `def search(q, filters={})`，同一进程里所有请求共享那个 dict，A 用户的过滤条件会漏进 B 用户的检索；检索后写 `if not docs:`，会把"确实没命中"和"检索抛错被吞"压成同一条降级路径，线上只能靠日志猜。
 
 ### 5. 心智差异：Python 更相信"约定"
 

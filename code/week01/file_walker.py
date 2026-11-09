@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from collections.abc import Iterator
+
 
 # 默认跳过的目录：版本控制、虚拟环境、缓存、输出目录等
 SKIP_DIRS = {
@@ -19,7 +21,7 @@ def walk_files(
     root: Path,
     skip: set[str] | None = SKIP_DIRS,
     include_hidden: bool = False,
-) -> "os.PathLike[str]":
+) -> Iterator[Path]:
     """遍历目录，惰性产出文件路径（生成器）。
 
     - skip: 要剪枝的目录名集合；None 表示不剪枝

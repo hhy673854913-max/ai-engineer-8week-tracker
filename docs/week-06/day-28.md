@@ -89,6 +89,8 @@ log.info("tool=%s elapsed=%.0fms ok=%s", name, ms, ok)
 def load_doc_cached(doc_id: str) -> str: ...
 ```
 
+注意这个例子：`lru_cache` 是 functools 里的装饰器，按入参缓存返回值、超出 `maxsize` 就淘汰最久未用的，它没有过期时间；要 60 秒 TTL 得用 `cachetools.TTLCache`，或者自己存 `(值, 取到的时刻)`，读的时候超过 60 秒就重取。知识库这种一天改几次的数据，用无过期的缓存会让你的 Agent 一直答旧文档，面试里被追问"缓存怎么失效"时这就是答案。
+
 ---
 
 ## 下午 14:00–16:30 · 实战

@@ -55,6 +55,8 @@ graph.add_edge("finalize", END)
 app = graph.compile(checkpointer=MemorySaver())
 ```
 
+先说定位：LangGraph 是 LangChain 团队出的编排库：把 Agent 的每一步写成节点、把跳转写成边，编译成一张能持久化、能中断恢复的图——它是目前 Agent 岗位 JD 里出现频率最高、面试最容易被追问"你怎么组织多步流程"的那个答案。另外 `Annotated[list, add_messages]` 里第二个参数是合并函数，缺了它后一个节点会把前一个节点写的 messages 直接覆盖掉，这是新手最常踩的坑。
+
 ### 3. 循环与终止
 
 ```python

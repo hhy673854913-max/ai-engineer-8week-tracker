@@ -22,6 +22,8 @@
 | 无状态 | 数据挂卷，配置用环境变量 | 可水平扩展 |
 | 非 root | `USER app` | 安全基线 |
 
+表里"多阶段构建"这个词值得单独解释：多阶段构建是把"装依赖 / 编译"和"运行时"拆成两个 FROM：第一个阶段（builder）里装 gcc 和需要编译的包，第二个阶段只 `COPY --from=builder /usr/local/lib/python3.12/site-packages` 加上你的代码，最终镜像里没有编译器、也没有 apt 缓存，体积和攻击面一起降下来。任务 1 这份依赖全是纯 Python 包，单阶段就够，所以只写了一个 `AS base`；等你把 `faiss-cpu`、`onnxruntime` 装进镜像时再加第二个阶段。
+
 ### 2. 环境变量与密钥
 
 ```text

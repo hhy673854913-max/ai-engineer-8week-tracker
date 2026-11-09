@@ -57,6 +57,8 @@ MCP 把它变成：**工具方实现一次 Server，任何支持 MCP 的客户�
 
 本地开发 99% 用 stdio。
 
+在 M3 里你会用 stdio 同时拉起 M1、M2 两个 Server——它们就是 Agent 的子进程，跟着 Agent 一起启停，这也是为什么 Day 27 的日志不能写 stdout。等这套东西要给别的团队远程调用，才换成 Streamable HTTP，而此时"谁能调、能调哪几个工具"必须你自己在 Server 里判，协议层不会替你挡。
+
 ### 4. MCP 与 Function Calling 的关系
 
 | | Function Calling | MCP |
@@ -79,6 +81,8 @@ MCP 把它变成：**工具方实现一次 Server，任何支持 MCP 的客户�
 
 生命周期：`initialize` → `initialized` 通知 → 正常请求 → `shutdown`。
 **握手失败是最常见的连接问题**，先看协议版本是否兼容。
+
+JSON-RPC 2.0 就是"用 JSON 传远程调用"的约定：请求带 `jsonrpc` / `id` / `method` / `params`，服务端用同一个 `id` 回 `result` 或 `error`，MCP 的每一条消息都是这个壳。平时用 SDK 你看不到它，但握手失败、工具名对不上、客户端收不到响应时，抓的就是这几行——面试问"MCP 底层怎么通信"答的就是这个。
 
 ---
 
@@ -114,6 +118,8 @@ def summarize(text: str) -> str:
 if __name__ == "__main__":
     mcp.run()   # 默认 stdio
 ```
+
+FastMCP 是官方 SDK 上的一层封装，定位类似 FastAPI：你写普通函数挂 `@mcp.tool()`，它负责生成 `tools/list` 要的 schema、接住 `tools/call`、把返回值包成 JSON-RPC 响应——上午那些报文它替你发了。真实项目里绝大多数 Server 都这么写，只有调不通时才回头抓报文。
 
 ### 任务 2 · 用 Inspector 调试（40 min）
 

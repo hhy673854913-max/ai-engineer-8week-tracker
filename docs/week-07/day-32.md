@@ -24,6 +24,8 @@
 
 四个指标合起来回答两个问题：**检索对不对**（precision/recall）、**生成老不老实**（faithfulness/relevancy）。
 
+先定位一下它是什么：RAGAS 是一个开源的 Python 评估库，本身不做检索也不做生成，只负责打分：你把 Day 31 那批样本（question / answer / contexts / reference_answer）喂进去，它用 LLM 当裁判把四个指标各算成一个 0–1 的分数，输出一张能直接贴进 README 的表。所以它不是"另一套评估数据"——你昨天那 50 条就是它的输入，`reference_answer` 对应它要的 `ground_truth`，负样本则留在 RAGAS 之外单独算拒答率。
+
 ### 2. 指标背后的 LLM 调用
 
 RAGAS 不是"公式计算"，它内部大量调用 LLM 做判断。所以：

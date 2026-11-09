@@ -64,6 +64,12 @@ class EventCopy(BaseModel):
 
 一句话记忆：**"数据从外面进来，就用 Pydantic。"** 这是第 1 周最重要的工程习惯，Day 05 的结构化输出全靠它。
 
+把这条线展开——**Pydantic 是 Python 的数据校验库**：你把字段声明成 `class X(BaseModel)`，实例化那一刻它就把输入逐个校验、必要时转换（`"3"` → `3`），不合法直接抛 `ValidationError` 并指到具体字段；同一份声明还能导出 JSON Schema、直接序列化成 JSON（`model_dump_json`）。它的位置在**系统边界**：外面进来的数据不可信，进门先过它。
+
+在 Agent 工程里它有三个躲不开的落点——① 模型返回的 JSON（Day 05 的结构化输出、Day 22 的工具参数），不校验就带着脏字段往下跑；② 工具的函数 schema，Function Calling 要求你提供 JSON Schema，`BaseModel.model_json_schema()` 直接生成；③ FastAPI 的请求体（Day 34），422 报错和 OpenAPI 文档都是它给的。
+
+所以判断线不是"dataclass 旧、Pydantic 新"，而是：**数据在自己进程内部流转用 dataclass，跨过信任边界（模型、用户、网络）就用 Pydantic**。
+
 ### 3. 异常处理：别写 `except Exception: pass`
 
 ```python
@@ -87,6 +93,8 @@ def read_config(path: str) -> dict:
 2. 用 `raise ... from e` 保留原始堆栈（面试常问）
 3. 自定义异常分层：`AppError` → 具体子类，CLI 层统一翻译成退出码
 
+这套分层第 5 周会原样变成工具的错误契约：`ToolError`（参数不对、结果为空）要作为 tool 消息回传给模型，让它换参数或换工具；`ConfigError` 和权限错误要直接终止并告警，因为重试一百次也不会成功。分层错了，Agent 会对一个必败的工具死循环，把配额和延迟一起烧光。
+
 ### 4. `logging` 而不是 `print`
 
 ```python
@@ -102,6 +110,8 @@ log.info("scan done: %d files", n)   # 延迟格式化，别用 f-string 拼
 ```
 
 `print` 用于"给人看的输出"，`logging` 用于"给机器和排障看的记录"。AI 应用里日志就是你的可观测性雏形（Day 33 展开）。
+
+在 Agent 里，一行日志要能串成一条 trace：`trace_id`（一次用户请求）、`span`（每次 LLM 调用/每次工具调用）、`model`、`prompt_tokens`、`completion_tokens`、`tool`、`latency_ms`。出问题时你不是翻 print，而是按 trace_id 把一次提问的每一步捞出来——Day 33 只是把这些字段换成结构化后端，字段本身今天就要设计对。
 
 ---
 
@@ -144,6 +154,8 @@ rename.add_argument("--apply", action="store_true", help="真正执行，不加�
 ```
 
 **dry-run 默认开启**是运维级习惯：破坏性操作先预览，`--apply` 才动手。
+
+把子命令想成工具：`scan` / `rename` 就是两个工具名，`--dir` / `--prefix` 就是它们的 `parameters` JSON Schema。今天的 `--apply` 第 5 周会变成工具参数 `dry_run`（默认 true）——模型先预演、人确认后再执行，这是防止模型一次幻觉就真删数据的最低成本手段。
 
 ### 任务 3 · 拼装与退出码（40 min）
 

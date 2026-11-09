@@ -87,6 +87,8 @@ def similarity_matrix(vecs: Sequence[Sequence[float]]) -> list[list[float]]: ...
 
 要求：不 import numpy 也能跑通（用于理解），再写一个 numpy 版本对比性能（10 万 × 1024 的差距有多大）。
 
+落到岗位上：手写这一版不是为了理解而理解：面试会让你白板写余弦并解释"为什么归一化后点积就是余弦"；线上排查"这条明明相关的文档召回分只有 0.61"时，你也得能手算一遍，确认是向量、归一化还是阈值的问题。两个版本都留在 `similarity.py` 里，numpy 版给后面检索用，纯 Python 版留给面试复盘。
+
 ### 任务 2 · 调用真实 embedding API（50 min）
 
 OpenAI 兼容写法（百炼 / OpenAI / 硅基流动都适用）：
@@ -106,6 +108,8 @@ def embed(texts: list[str], model: str = "text-embedding-v3") -> list[list[float
 
 > 仓库里的 `code/week03/mini_rag/embeddings.py` 读的是独立的 `EMBED_*` 变量，所以"Kimi 聊天 + 百炼嵌入"
 > 这种混搭可以直接用；聊天厂商不支持 embedding 时它会给明确提示，而不是抛一个 404。
+
+落到工程上：这条批量上限直接决定 M2 入库脚本长什么样：要把上千个块按 10–25 条切片、失败重试、记录已完成的 batch，否则中途一次 429 就得从头再嵌一遍（也就重复付一遍钱）。今天先在 `embed()` 外套一层 `embed_batched(texts, size=16)`，M2 建索引时原样复用。
 
 ### 任务 3 · 相似度实验（60 min）
 

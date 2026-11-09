@@ -42,6 +42,8 @@ chunks = [text[i : i + size] for i in range(0, len(text), size - overlap)]
 按句子算相邻 embedding 的相似度，在"相似度骤降"处切分（话题转换点）。
 效果最好但成本最高（要先算 embedding），一般只用于高质量知识库。
 
+LangChain 是 Python 里最常用的 LLM 应用开发框架，`RecursiveCharacterTextSplitter` 是它的默认分块器——你之后多半会在公司项目里用到它，面试也一定会问"为什么不直接用 LangChain 的分块器"。手写一遍的价值在于你才知道每个分隔符在什么情况下失效，用框架时才调得动参数、出了问题才定位得到。
+
 ### 3. 参数怎么定
 
 | 参数 | 经验值 | 说明 |
@@ -84,6 +86,8 @@ Chunk(
 | Word | `python-docx` | 样式信息可帮助分节 |
 | 网页 | `trafilatura` / `readability` | 先去掉导航与广告 |
 | Excel | `openpyxl` / `pandas` | 一行一条更合理，别按字符切 |
+
+这一节是你和真实数据第一次打照面：企业知识库七成以上是 PDF/Word/扫描件，解析错一行，后面的分块、嵌入、生成全跟着错——M2 答得不准，一半原因在这里而不在模型。下午任务 2 请至少塞 5 篇 PDF 进 `data/kb`（`pdfplumber` 抽文本、抽不出字的页记进 `failed.txt`），先把"解析失败率"这个数字量出来，Day 13 的 `docs_dir.rglob("*.md")` 也顺手改成同时扫 PDF。
 
 ---
 
