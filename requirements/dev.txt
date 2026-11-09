@@ -1,3 +1,4 @@
 # 本地开发与 CI（不需要任何 API Key 就能跑）
 pytest>=8.2
 ruff>=0.6
+mypy>=1.11

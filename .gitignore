@@ -11,6 +11,7 @@ venv/
 .ruff_cache/
 .coverage
 htmlcov/
+.tmp/
 
 # ---- 密钥与本地配置 ----
 .env
