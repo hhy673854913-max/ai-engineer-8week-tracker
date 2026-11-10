@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+
 log = logging.getLogger("llm")
 
 # ---------------------------------------------------------------------------
@@ -32,6 +33,13 @@ class ConfigError(LLMError):
 
 class RetryableError(LLMError):
     """网络抖动 / 限流 / 服务端 5xx，可以重试。"""
+
+
+class ProtocolError(LLMError):
+    """供应商返回 200 但响应体不符合 OpenAI 协议规范（如 choices 为空）。
+
+    属于供应商侧的 bug，重试无意义，应由调用方决定是否告警/切换供应商。
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +107,8 @@ PROVIDERS: dict[str, dict[str, object]] = {
     },
 }
 
-
+# 追求极简依赖，或 .env 格式简单且固定在当前目录
+# 不使用load_dotenv
 def load_env_file(path: str | Path = ".env") -> None:
     """极简 .env 加载：KEY=VALUE，# 开头为注释。
 
@@ -253,11 +262,12 @@ class LLMClient:
 
     def __init__(self, config: LLMConfig | None = None, *, client: Any = None):
         self.config = config or load_config()
+        self.total = Usage()
         if client is not None:
             self._client, self._aclient = client, client
             return
         from openai import AsyncOpenAI, OpenAI
-
+        
         self._client = OpenAI(
             api_key=self.config.api_key,
             base_url=self.config.base_url,
@@ -270,7 +280,6 @@ class LLMClient:
             timeout=self.config.timeout,
             max_retries=0,
         )
-        self.total = Usage()
 
     # -- 内部：把 SDK 响应转成 ChatResult -------------------------------
     def _to_result(self, resp: Any, latency_ms: int) -> ChatResult:
@@ -278,6 +287,8 @@ class LLMClient:
         if getattr(resp, "usage", None):
             usage = Usage(resp.usage.prompt_tokens or 0, resp.usage.completion_tokens or 0)
         self.total.add(usage)
+        if not getattr(resp, "choices", None):
+            raise ProtocolError(f"供应商返回 200 但 choices 为空: model={getattr(resp, 'model', '?')}")
         choice = resp.choices[0]
         return ChatResult(
             content=choice.message.content or "",
@@ -364,6 +375,8 @@ class LLMClient:
             except Exception as exc:  # noqa: BLE001
                 if attempt >= self.config.max_retries or not _classify(exc):
                     raise LLMError(f"调用失败（{type(exc).__name__}）: {exc}") from exc
+                # time.sleep(5)       # 阻塞：整个线程卡死 5 秒，别的任务都别想跑
+                # asyncio.sleep(5)    # 异步：只是"这个协程"等 5 秒，事件循环可以趁机去跑其他协程
                 await asyncio.sleep(_backoff(attempt))
                 continue
             return self._to_result(resp, int((time.perf_counter() - t0) * 1000))

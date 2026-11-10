@@ -66,6 +66,10 @@ DeepSeek、通义千问、智谱、月之暗面、以及各类中转网关，都
 **关键工程判断**：重试必须有上限 + 退避 + 抖动，否则限流时会把服务打挂（惊群）。
 
 ```python
+# 
+# `base * 2 ** attempt` 指数退避 ：基础延迟 × 2的尝试次数（1s, 2s, 4s, 8s...） 
+# `min(..., cap)` 封顶 ：延迟不超过上限（如最多 30 秒），避免无限增长 
+# `+ random.uniform(0, jitter)` 抖动 ：添加随机偏移（0~jitter 秒），打散重试时间
 delay = min(base * 2 ** attempt, cap) + random.uniform(0, jitter)
 ```
 
@@ -101,6 +105,17 @@ print(resp.usage)          # prompt_tokens / completion_tokens / total_tokens
 print(resp.model, resp.id) # 线上排障要记录的字段
 ```
 
+补充说明，`.env` 文件没有被自动加载 ，Python 的`os.environ` 只能读取 系统环境变量 ，不会自动读取项目根目录的`.env` 文件。
+安装 python-dotenv
+`pip install python-dotenv`
+修改代码开头：
+`from dotenv import load_dotenv
+import os
+
+load_dotenv()  # 自动加载 .env 到环境变量
+
+client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], ...)`
+
 ### 任务 2 · 封装配置与客户端（40 min）
 
 完整实现见 [`code/shared/llm_client.py`](../../code/shared/llm_client.py)，骨架：
@@ -126,9 +141,14 @@ def load_config(provider: str | None = None) -> LLMConfig:
 
 ```python
 def _should_retry(exc: Exception) -> bool:
+    # 1. 如果是超时或连接错误 → 可重试（网络问题，稍后可能恢复），直接超时
+    #`isinstance` 是 Python 的 类型检查函数 ，判断对象是否是指定类型（或其子类）。
+    # 这里的写法的等价于 `isinstance(exc, APITimeoutError) or isinstance(exc, APIConnectionError)
     if isinstance(exc, (APITimeoutError, APIConnectionError)):
         return True
     status = getattr(exc, "status_code", None)
+    #| 429 | 限流 / 配额 | 是 | 指数退避 + 抖动 |
+    #| 500 / 502 / 503 | 服务端抖动 | 是 | 退避重试，最多 3–5 次 |
     return status is not None and (status == 429 or status >= 500)
 
 for attempt in range(max_retries):
@@ -141,6 +161,9 @@ for attempt in range(max_retries):
 ```
 
 再用 `tenacity` 重写一遍，对比可读性。**先手写理解，再用库提效**——这是整个八周的方法论。
+
+day03_first_call_tenacity.py
+
 
 ### 任务 4 · 成本统计与日志（30 min）
 
@@ -181,6 +204,6 @@ async def achat(self, messages, **kw) -> str:
 ## 复盘清单
 
 - [ ] 能画出"messages → token → 响应 → usage"的链路
-- [ ] 能背出"可重试 / 不可重试"的状态码分组
+- [ ] 能背出"可重试 / 不可重试"的状态码分组 可重试【500 502 503 425】
 - [ ] `llm_client.py` 通过冒烟测试（无 Key 时应给出明确的 ConfigError）
 - [ ] commit：`day03: 生产级 llm_client（超时/重试/日志/成本）`
