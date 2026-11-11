@@ -333,11 +333,19 @@ class LLMClient:
 
     # -- 流式 -----------------------------------------------------------
     def stream(self, messages: Iterable[dict], **kwargs: Any) -> Iterable[str]:
-        """逐段产出文本增量。网络异常会向上抛，由调用方决定是否重试。"""
+        """逐段产出文本增量。网络异常会向上抛，由调用方决定是否重试。
+
+        兼容旧用法：默认只产出文本字符串。
+        传入 with_seq=True 时产出 (seq, text) 元组，seq 从 0 递增，
+        供调用方做断点续传时的去重与排序。
+        """
+        with_seq = kwargs.pop("with_seq", False)
         params = self._params(messages, **kwargs)
+        # 设置流式
         params["stream"] = True
         params.setdefault("stream_options", {"include_usage": True})
         usage = Usage()
+        seq = 0
         for chunk in self._client.chat.completions.create(**params):
             if getattr(chunk, "usage", None):
                 usage = Usage(chunk.usage.prompt_tokens or 0, chunk.usage.completion_tokens or 0)
@@ -345,7 +353,11 @@ class LLMClient:
                 continue
             piece = chunk.choices[0].delta.content or ""
             if piece:
-                yield piece
+                if with_seq:
+                    yield seq, piece
+                    seq += 1
+                else:
+                    yield piece
         self.total.add(usage)
 
     # -- 异步 -----------------------------------------------------------
