@@ -32,7 +32,9 @@ def extract_json(text: str) -> str:
 
     处理三类常见污染：markdown 代码块、前后解释、多个对象（取第一个完整对象）。
     """
+    # 前后去空
     text = text.strip()
+    # 去除markdown 代码块、前后解释
     fence = _FENCE.search(text)
     if fence:
         text = fence.group(1).strip()
@@ -47,6 +49,7 @@ def loads_lenient(text: str) -> dict[str, Any]:
     """先严格解析，失败后修掉尾逗号再试一次。"""
     try:
         return json.loads(text)
+    # 不符合标准 JSON 规范，尝试修掉尾逗号
     except json.JSONDecodeError:
         fixed = _TRAILING_COMMA.sub(r"\1", text)
         return json.loads(fixed)
@@ -85,9 +88,10 @@ def generate_with_repair(
     *,
     max_repair: int = 2,
     **chat_kwargs: Any,
-) -> T:
+) -> tuple[T, int]:
     """生成 → 解析 → 校验 → 失败带错误重试，最多 max_repair 次修复。
 
+    返回 (解析结果, 实际调用次数)。调用次数 = 1 + 修复次数。
     chat_fn 需返回 ChatResult（有 .content 属性）或 str。
     """
     messages: list[dict] = [{"role": "user", "content": prompt}]
@@ -96,7 +100,7 @@ def generate_with_repair(
         result = chat_fn(messages, **chat_kwargs)
         raw = getattr(result, "content", result)
         try:
-            return model_from_text(raw, model)
+            return model_from_text(raw, model), attempt + 1
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
             last_error = exc
             log.warning("结构化解析失败（第 %d 次）: %s", attempt + 1, exc)

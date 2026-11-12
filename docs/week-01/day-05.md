@@ -136,7 +136,7 @@ def loads_lenient(text: str) -> dict[str, Any]:
         return json.loads(fixed)
 ```
 
-### 任务 2 · 定义业务模型（40 min）
+### 任务 2 · 定义业务模型（40 min）类 CopyVariant
 
 ```python
 from pydantic import BaseModel, Field, field_validator
