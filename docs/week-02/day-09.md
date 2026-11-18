@@ -125,6 +125,21 @@ class ImageDesc(BaseModel):
 
 用 Pydantic 的 `description` 做"字段级 prompt"——这是给模型看文档，也给下游看文档，一举两得。
 
+class ImageDesc(BaseModel):
+只用于这边的校验，用于大模型的还是使用prompt工程的限定
+DESCRIBE_PROMPT = """描述这张图片，输出 JSON：
+{
+  "scene": "一句话场景描述",
+  "main_objects": ["主体物体，1-8 个"],
+  "people": "人物描述，没有则 null",
+  "text_in_image": "图中文字，逐字转录；不确定的单词写 unclear；没有则 null",
+  "style": "色调/画风，如 暖色调/卡通",
+  "search_tags": ["检索标签，3-10 个"],
+  "confidence": 0.0
+}
+只输出 JSON，不要 markdown 代码块，不要解释。"""
+
+
 ### 任务 3 · 批量处理与成本核算（60 min）
 
 ```python
