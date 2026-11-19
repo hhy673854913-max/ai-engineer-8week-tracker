@@ -3,10 +3,12 @@
 用法（在仓库根目录执行）：
     python code/week02/m1_brief/pipeline.py --mock
     python code/week02/m1_brief/pipeline.py --mock --limit 10 --out output
+    python code/week02/m1_brief/pipeline.py --auto --limit 50 --out output
 
 设计要点：
 - mock 模式完全离线，CI 与演示都能跑
-- 每一步都落盘（原始数据 / 简报 / 报表），可回放
+- 自动模式默认基于可信源列表采集前一日 AI 相关资讯
+- 每一步都落盘（原始数据 / 简报 / 报表 / 可信源快照），可回放
 - 单条失败降级为规则抽取，不中断整批
 """
 
@@ -27,7 +29,16 @@ if str(ROOT) not in sys.path:
 from code.week02.m1_brief.dedup import dedup  # noqa: E402
 from code.week02.m1_brief.extract import extract_batch  # noqa: E402
 from code.week02.m1_brief.models import BriefItem, PipelineReport, RawItem  # noqa: E402
-from code.week02.m1_brief.sources import load_mock  # noqa: E402
+from code.week02.m1_brief.sources import (  # noqa: E402
+    enrich_empty_content,
+    fetch_all_trusted_sources,
+    fetch_rss,
+    filter_ai_related,
+    filter_low_quality,
+    filter_previous_day,
+    load_mock,
+    load_trusted_sources,
+)
 
 
 def freshness_score(item: BriefItem, now: datetime) -> float:
@@ -51,8 +62,10 @@ def render_markdown(items: list[BriefItem], report: PipelineReport) -> str:
     lines = [
         f"# 智能资讯简报 · {report.date}",
         "",
-        f"> 采集 {report.fetched} 条 → 去重后 {report.after_dedup} 条 → 成功抽取 {report.extracted_ok} 条"
-        f"（失败 {report.failed}）｜平均可信度 {report.avg_credibility:.1f}",
+        f"> 采集 {report.fetched} 条 → 前一日过滤后 {report.after_time_filter} 条"
+        f" → AI 过滤后 {report.after_ai_filter} 条 → 正文增强后 {report.after_content_filter} 条"
+        f" → 去重后 {report.after_dedup} 条"
+        f" → 成功抽取 {report.extracted_ok} 条（失败 {report.failed}）｜平均可信度 {report.avg_credibility:.1f}",
         "",
     ]
     by_category: dict[str, list[BriefItem]] = {}
@@ -76,24 +89,42 @@ def render_markdown(items: list[BriefItem], report: PipelineReport) -> str:
     return "\n".join(lines)
 
 
-async def run(mock: bool, limit: int, out_dir: Path, rss: list[str]) -> int:
+async def run(mock: bool, auto: bool, limit: int, out_dir: Path, rss: list[str]) -> int:
     t0 = time.perf_counter()
     now = datetime.now()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     raw_items: list[RawItem] = []
-    if mock or not rss:
+    trusted_snapshot: list[dict] = []
+
+    if mock:
         raw_items += load_mock()
-    for url in rss:
-        from code.week02.m1_brief.sources import fetch_rss
+    elif rss:
+        for url in rss:
+            raw_items += fetch_rss(url, limit=limit)
+    elif auto:
+        trusted_sources = load_trusted_sources()
+        trusted_snapshot = [s.model_dump() for s in trusted_sources]
+        raw_items += fetch_all_trusted_sources(trusted_sources, limit=limit)
+    else:
+        # 默认行为：未指定模式时，也按自动模式处理，确保“采集器自动搜集前一日信息”
+        trusted_sources = load_trusted_sources()
+        trusted_snapshot = [s.model_dump() for s in trusted_sources]
+        raw_items += fetch_all_trusted_sources(trusted_sources, limit=limit)
 
-        raw_items += fetch_rss(url, limit=limit)
-    raw_items = raw_items[:limit] if limit else raw_items
+    fetched = len(raw_items)
+    time_filtered = filter_previous_day(raw_items, now) if (auto or rss or not mock) else raw_items
+    after_time_filter = len(time_filtered)
+    ai_filtered, removed_ai = filter_ai_related(time_filtered)
+    after_ai_filter = len(ai_filtered)
+    content_filtered, filled_content, failed_content = enrich_empty_content(ai_filtered)
+    quality_filtered, removed_low_quality, removed_empty_text = filter_low_quality(content_filtered)
+    after_content_filter = len(quality_filtered)
 
-    payload = [{"url": r.url, "title": r.title, "content": r.content} for r in raw_items]
+    payload = [{"url": r.url, "title": r.title, "content": r.content} for r in quality_filtered]
     kept, removed = dedup(payload)
     kept_urls = {k["url"] for k in kept}
-    deduped = [r for r in raw_items if r.url in kept_urls]
+    deduped = [r for r in quality_filtered if r.url in kept_urls]
 
     client = None
     use_llm = not mock
@@ -112,8 +143,15 @@ async def run(mock: bool, limit: int, out_dir: Path, rss: list[str]) -> int:
     report = PipelineReport(
         date=now.strftime("%Y-%m-%d"),
         sources=len({r.source for r in raw_items}),
-        fetched=len(raw_items),
+        fetched=fetched,
+        after_time_filter=after_time_filter,
+        after_ai_filter=after_ai_filter,
+        after_content_filter=after_content_filter,
         after_dedup=len(deduped),
+        content_filled=filled_content,
+        content_fetch_failed=failed_content,
+        removed_low_quality=removed_low_quality,
+        removed_empty_text=removed_empty_text,
         extracted_ok=len(brief_items) - len(failed),
         failed=len(failed),
         avg_credibility=round(sum(i.credibility for i in brief_items) / max(len(brief_items), 1), 1),
@@ -130,22 +168,27 @@ async def run(mock: bool, limit: int, out_dir: Path, rss: list[str]) -> int:
         "\n".join(json.dumps(r.model_dump(mode="json"), ensure_ascii=False) for r in raw_items),
         encoding="utf-8",
     )
+    if trusted_snapshot:
+        (out_dir / f"trusted_sources_{now:%Y%m%d}.json").write_text(
+            json.dumps(trusted_snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
     print(markdown)
     print("-" * 60)
     print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-    print(f"去重移除 {removed} 条；产物目录：{out_dir}")
+    print(f"AI 过滤移除 {removed_ai} 条；去重移除 {removed} 条；产物目录：{out_dir}", flush=True)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="M1 智能资讯简报 v2")
     parser.add_argument("--mock", action="store_true", help="离线模式（不调用模型）")
-    parser.add_argument("--rss", action="append", default=[], help="RSS 地址，可重复")
+    parser.add_argument("--auto", action="store_true", help="自动模式（基于可信源列表采集前一日 AI 资讯）")
+    parser.add_argument("--rss", action="append", default=[], help="RSS 地址，可重复（手动覆盖）")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--out", type=Path, default=ROOT / "output")
     args = parser.parse_args(argv)
-    return asyncio.run(run(args.mock, args.limit, args.out, args.rss))
+    return asyncio.run(run(args.mock, args.auto, args.limit, args.out, args.rss))
 
 
 if __name__ == "__main__":

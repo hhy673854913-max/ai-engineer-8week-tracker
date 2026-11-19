@@ -1,0 +1,44 @@
+[
+  {
+    "name": "OpenAI Blog",
+    "rss": "https://openai.com/blog/rss.xml",
+    "tier": "官方公告",
+    "enabled": true
+  },
+  {
+    "name": "Google DeepMind Blog",
+    "rss": "https://deepmind.google/blog/rss.xml",
+    "tier": "官方公告",
+    "enabled": true
+  },
+  {
+    "name": "Anthropic News",
+    "rss": "https://www.anthropic.com/news/rss.xml",
+    "tier": "官方公告",
+    "enabled": true
+  },
+  {
+    "name": "Hugging Face Blog",
+    "rss": "https://huggingface.co/blog/feed.xml",
+    "tier": "垂直媒体",
+    "enabled": true
+  },
+  {
+    "name": "机器之心",
+    "rss": "https://www.jiqizhixin.com/rss",
+    "tier": "权威媒体",
+    "enabled": true
+  },
+  {
+    "name": "量子位",
+    "rss": "https://www.qbitai.com/feed",
+    "tier": "权威媒体",
+    "enabled": true
+  },
+  {
+    "name": "36氪 AI",
+    "rss": "https://36kr.com/feed-ai",
+    "tier": "权威媒体",
+    "enabled": true
+  }
+]

@@ -49,13 +49,29 @@ class BriefItem(BaseModel):
         return cls(id=raw.id, source=raw.source, url=raw.url, published_at=raw.published_at, **fields)  # type: ignore[arg-type]
 
 
+class TrustedSource(BaseModel):
+    """可信 RSS 信源配置。"""
+
+    name: str
+    rss: str
+    tier: str = "垂直媒体"
+    enabled: bool = True
+
+
 class PipelineReport(BaseModel):
     """每次运行的成本与质量报表——这是"能进简历"的证据。"""
 
     date: str
     sources: int = 0
     fetched: int = 0
+    after_time_filter: int = 0
+    after_ai_filter: int = 0
+    after_content_filter: int = 0
     after_dedup: int = 0
+    content_filled: int = 0
+    content_fetch_failed: int = 0
+    removed_low_quality: int = 0
+    removed_empty_text: int = 0
     extracted_ok: int = 0
     failed: int = 0
     avg_credibility: float = 0.0

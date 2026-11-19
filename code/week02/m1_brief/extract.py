@@ -66,7 +66,8 @@ def heuristic_extract(raw: RawItem) -> BriefItem:
 
 def llm_extract(client: Any, raw: RawItem, *, max_tokens: int = 500) -> BriefItem:
     """LLM 抽取；失败时抛出，由批量层决定降级策略。"""
-    prompt = EXTRACT_PROMPT.format(text=raw.content[:2000])
+    text = raw.content.strip() or raw.title.strip()
+    prompt = EXTRACT_PROMPT.format(text=text[:2000])
     result = client.chat(
         [{"role": "user", "content": prompt}],
         temperature=0,
@@ -74,10 +75,14 @@ def llm_extract(client: Any, raw: RawItem, *, max_tokens: int = 500) -> BriefIte
         response_format={"type": "json_object"},
     )
     parsed = client_parse(result.content)
+    title = str(parsed.get("title") or raw.title).strip()
+    if len(title) > 30:
+        # 避免把英文单词从中间切断
+        title = title[:30].rsplit(" ", 1)[0] + "…"
     return BriefItem.from_raw(
         raw,
-        title=str(parsed.get("title") or raw.title)[:30],
-        summary=str(parsed.get("summary") or "")[:120],
+        title=title,
+        summary=str(parsed.get("summary") or "").strip()[:120],
         category=parsed.get("category") if parsed.get("category") in CATEGORY_KEYWORDS else "其他",
         entities=[str(x) for x in (parsed.get("entities") or [])][:8],
         credibility=int(parsed.get("credibility") or 50),
